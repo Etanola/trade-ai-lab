@@ -210,3 +210,23 @@ __marimo__/
 data/
 model/
 tmp/
+
+# Node modules
+node_modules/
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.env.local
+.env.*.local
+
+# package-lock.json and yarn.lock
+# Uncomment if you prefer to commit these
+# package-lock.json
+# yarn.lock

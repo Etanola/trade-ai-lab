@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "チェック: 市場データ取得",
+            "type": "shell",
+            "command": "C:\\Users\\Etano\\miniconda3\\envs\\tradeai\\python.exe tools/check_market.py",
+            "group": "build",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "チェック: 市場データ取得（Node）",
+            "type": "shell",
+            "command": "node tools/check_market.js",
+            "group": "build",
+            "presentation": {
+                "reveal": "always"
+            }
+        }
+    ]
+}
