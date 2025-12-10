@@ -230,3 +230,5 @@ yarn-error.log*
 # Uncomment if you prefer to commit these
 # package-lock.json
 # yarn.lock
+
+.env
