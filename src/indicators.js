@@ -125,3 +125,12 @@ export function calculateIndicators(candles) {
     bb
   };
 }
+
+// 新しい関数：全ての足に対して一度だけインジケータを計算
+export function calculateAllIndicators(candles) {
+  return candles.map((_, i) => {
+    if (i < 50) return null;  // インジ計算できない足はスキップ
+    const slice = candles.slice(0, i + 1);
+    return calculateIndicators(slice);
+  });
+}
