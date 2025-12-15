@@ -3,8 +3,8 @@ import { runBacktest } from "../lib/backtestCore.js";
 
 // バックテストケース定義
 const cases = [
-  { interval: "1m", count: 43200, label: "1m / 約30日" },
-  { interval: "5m", count: 50000, label: "5m / 約6ヶ月" }
+  { interval: "1m", count: 4320, label: "1m / 約30日" },
+  { interval: "5m", count: 5000, label: "5m / 約6ヶ月" }
 ];
 
 async function runAll() {
