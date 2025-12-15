@@ -422,9 +422,9 @@ async function runOnce() {
     if (buySignal) {
       await sendDiscord(`🟢 Buy signal detected ${price}`);
     }
-    // if (sellSignal) {
-    //   await sendDiscord(`🔴 Sell signal detected ${price}`);
-    // }
+    if (sellSignal) {
+      await sendDiscord(`🔴 Sell signal detected ${price}`);
+    }
 
     console.log(`buySignal=${buySignal}, sellSignal=${sellSignal}`);
 
