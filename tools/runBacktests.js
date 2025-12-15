@@ -1,5 +1,5 @@
-import { getCandles } from "../lib/data.js";
-import { runBacktest } from "../lib/backtestCore.js";
+import { getCandles } from "../src/data.js";
+import { runBacktest } from "../src/backtestCore.js";
 
 // バックテストケース定義
 const cases = [
