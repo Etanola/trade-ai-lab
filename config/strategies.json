@@ -1,0 +1,11 @@
+{
+  "trend": [
+    { "maShort": 7, "maLong": 50, "rsiMin": 50, "trail": 0.05 },
+    { "maShort": 10, "maLong": 60, "rsiMin": 55, "trail": 0.06 }
+  ],
+
+  "original": [
+    { "stopLoss": 0.05 },
+    { "stopLoss": 0.08 }
+  ]
+}

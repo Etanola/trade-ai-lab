@@ -112,6 +112,8 @@ export function calculateIndicators(candles) {
 
   const ma5 = sma(closes, 5);
   const ma20 = sma(closes, 20);
+  const ma7 = sma(closes, 7);
+  const ma50 = sma(closes, 50);
   const rsi = calcRSI(closes, 14);
   const macd = calcMACD(closes);
   const bb = calcBollingerBands(closes, 20, 2);
@@ -120,6 +122,8 @@ export function calculateIndicators(candles) {
     closes,
     ma5,
     ma20,
+    ma7,
+    ma50,
     rsi,
     macd,
     bb

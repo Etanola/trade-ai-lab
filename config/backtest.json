@@ -1,0 +1,17 @@
+{
+  "initialCapital": 200000,
+  "tests": [
+    {
+      "label": "1m / 30days",
+      "pair": "BTCJPY",
+      "interval": "1m",
+      "count": 43200
+    },
+    {
+      "label": "5m / 6months",
+      "pair": "BTCJPY",
+      "interval": "5m",
+      "count": 50000
+    }
+  ]
+}

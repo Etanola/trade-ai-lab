@@ -1,35 +1,34 @@
 import { calculateAllIndicators } from "./indicators.js";
-import { shouldBuy, shouldSell } from "./strategy.js";
 
-export function runBacktest(candles, initial = 200000) {
-  // ★ あらかじめ全部のインジを計算
-  const indicators = calculateAllIndicators(candles);
-
+export function runBacktest(candles, initial = 200000, strategy) {
   let jpy = initial;
   let position = 0;
   let entry = 0;
+  let peak = 0;
 
   let win = 0, lose = 0;
   let maxEquity = jpy;
   let maxDD = 0;
   let trades = 0;
+  
+  const indicators = calculateAllIndicators(candles);
 
   for (let i = 50; i < candles.length; i++) {
     const ind = indicators[i];
-    if (!ind) continue;
-
     const price = candles[i].close;
 
-    // エントリー
-    if (position === 0 && shouldBuy(ind)) {
-      position = jpy / price;
-      entry = price;
-      jpy = 0;
-      trades++;
-    }
-    // エグジット
-    else if (position > 0) {
-      if (shouldSell(ind, price, entry)) {
+    if (position === 0) {
+      if (strategy.shouldBuy(ind)) {
+        position = jpy / price;
+        entry = price;
+        peak = price;  // Peakリセット
+        jpy = 0;
+        trades++;
+      }
+    } else {
+      peak = Math.max(peak, price);
+
+      if (strategy.shouldSell(ind, price, entry, peak)) {
         const value = position * price;
         const profit = value - entry * position;
 
@@ -39,6 +38,7 @@ export function runBacktest(candles, initial = 200000) {
         jpy = value;
         position = 0;
         entry = 0;
+        peak = 0;
       }
     }
 
@@ -50,6 +50,7 @@ export function runBacktest(candles, initial = 200000) {
   const finalEquity = jpy + position * candles[candles.length - 1].close;
 
   return {
+    strategyName,
     finalEquity: Math.round(finalEquity),
     trades,
     win,
