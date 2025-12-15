@@ -1,140 +1,156 @@
-// ========= インジケータ計算 =========
+// ========= 高速インジケータ計算（単一パス） =========
 
-// ---- SMA ----
-function sma(values, period) {
-  if (!Array.isArray(values) || values.length < period) return null;
-  const slice = values.slice(-period);
-  const sum = slice.reduce((a, b) => a + b, 0);
-  return sum / period;
-}
+export function calculateAllIndicators(candles) {
+  const n = candles.length;
+  const closes = new Array(n);
+  for (let i = 0; i < n; i++) closes[i] = candles[i].close;
 
-// ---- RSI ----
-function calcRSI(closes, period = 14) {
-  const len = closes.length;
-  if (len < period + 1) return null;
+  const out = new Array(n).fill(null);
 
-  let gains = 0;
-  let losses = 0;
+  // SMA 用スライディング和
+  let sum5 = 0, sum7 = 0, sum20 = 0, sum50 = 0;
 
-  for (let i = len - period; i < len; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff > 0) gains += diff;
-    else losses -= diff;
-  }
+  // EMA 用の前値
+  let ema12 = null, ema26 = null, signal = null;
+  const k12 = 2 / (12 + 1);
+  const k26 = 2 / (26 + 1);
+  const k9 = 2 / (9 + 1);
 
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
+  // MACD バッファ（初期シグナル算出用）
+  const macdBuffer = [];
+  let prevMacd = null, prevSignal = null;
 
-  if (avgLoss === 0) return 100;
+  // RSI 用（Wilder の平滑化）
+  const rsiPeriod = 14;
+  let avgGain = null, avgLoss = null;
 
-  const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
-}
+  // Bollinger 用
+  let sum20sq = 0;
 
-// ---- EMA ----
-function ema(values, period) {
-  if (!Array.isArray(values) || values.length < period) return null;
+  for (let i = 0; i < n; i++) {
+    const close = closes[i];
 
-  const k = 2 / (period + 1);
+    // スライディング和の更新
+    sum5 += close; if (i - 5 >= 0) sum5 -= closes[i - 5];
+    sum7 += close; if (i - 7 >= 0) sum7 -= closes[i - 7];
+    sum20 += close; if (i - 20 >= 0) sum20 -= closes[i - 20];
+    sum50 += close; if (i - 50 >= 0) sum50 -= closes[i - 50];
 
-  // period 本での SMA が初期値
-  let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    if (i - 20 >= 0) {
+      // sum20sq 更新
+      sum20sq += close * close;
+      if (i - 20 >= 0) sum20sq -= closes[i - 20] * closes[i - 20];
+    } else if (i === 19) {
+      // 初回で全体を計算
+      sum20sq = 0;
+      for (let j = 0; j <= 19; j++) sum20sq += closes[j] * closes[j];
+    }
 
-  for (let i = period; i < values.length; i++) {
-    prev = values[i] * k + prev * (1 - k);
-  }
+    let ma5 = i >= 4 ? sum5 / 5 : null;
+    let ma7 = i >= 6 ? sum7 / 7 : null;
+    let ma20 = i >= 19 ? sum20 / 20 : null;
+    let ma50 = i >= 49 ? sum50 / 50 : null;
 
-  return prev;
-}
+    // EMA12 初期値は最初の 12 本の SMA
+    if (ema12 === null && i >= 11) {
+      let s = 0; for (let j = i - 11; j <= i; j++) s += closes[j];
+      ema12 = s / 12;
+    } else if (ema12 !== null) {
+      ema12 = close * k12 + ema12 * (1 - k12);
+    }
 
-// ---- MACD ----
-function calcMACD(closes) {
-  if (closes.length < 26) return null;
+    if (ema26 === null && i >= 25) {
+      let s = 0; for (let j = i - 25; j <= i; j++) s += closes[j];
+      ema26 = s / 26;
+    } else if (ema26 !== null) {
+      ema26 = close * k26 + ema26 * (1 - k26);
+    }
 
-  // 最新値の MACD
-  const macdValue = ema(closes, 12) - ema(closes, 26);
+    let macd = null;
+    if (ema12 !== null && ema26 !== null) {
+      macd = ema12 - ema26;
+      // macdBuffer はシグナル初期値算出用
+      macdBuffer.push(macd);
+      if (macdBuffer.length < 9) {
+        // シグナル未確定
+      } else if (macdBuffer.length === 9 && signal === null) {
+        // 初期シグナルは直近 9 本の平均
+        let s = 0; for (let j = 0; j < 9; j++) s += macdBuffer[j];
+        signal = s / 9;
+      } else if (signal !== null) {
+        prevSignal = signal;
+        signal = macd * k9 + signal * (1 - k9);
+      }
+    }
 
-  // 過去 MACD シリーズ
-  const macdSeries = [];
-  for (let i = 26; i <= closes.length; i++) {
-    const slice = closes.slice(0, i);
-    const e12 = ema(slice, 12);
-    const e26 = ema(slice, 26);
-    if (e12 !== null && e26 !== null) {
-      macdSeries.push(e12 - e26);
+    let macdPrev = null, signalPrev = null;
+    if (macd !== null) {
+      macdPrev = prevMacd;
+      prevMacd = macd;
+    }
+    if (signal !== null) {
+      signalPrev = prevSignal;
+    }
+
+    // RSI
+    let rsi = null;
+    if (i >= 1) {
+      const diff = closes[i] - closes[i - 1];
+      const gain = diff > 0 ? diff : 0;
+      const loss = diff < 0 ? -diff : 0;
+
+      if (avgGain === null && i >= rsiPeriod) {
+        // 初期 avgGain/avgLoss の計算
+        let g = 0, l = 0;
+        for (let j = 1; j <= rsiPeriod; j++) {
+          const d = closes[j] - closes[j - 1];
+          if (d > 0) g += d; else l += -d;
+        }
+        avgGain = g / rsiPeriod;
+        avgLoss = l / rsiPeriod;
+      } else if (avgGain !== null) {
+        avgGain = (avgGain * (rsiPeriod - 1) + gain) / rsiPeriod;
+        avgLoss = (avgLoss * (rsiPeriod - 1) + loss) / rsiPeriod;
+      }
+
+      if (avgGain !== null) {
+        if (avgLoss === 0) rsi = 100;
+        else {
+          const rs = avgGain / avgLoss;
+          rsi = 100 - 100 / (1 + rs);
+        }
+      }
+    }
+
+    // Bollinger
+    let bb = null;
+    if (i >= 19) {
+      const mean = ma20; // already computed
+      const variance = sum20sq / 20 - mean * mean;
+      const std = Math.sqrt(Math.max(0, variance));
+      bb = {
+        middle: mean,
+        upper: mean + 2 * std,
+        lower: mean - 2 * std,
+        width: (2 * std * 2) / mean
+      };
+    }
+
+    // 出力インジケータ（十分な情報が揃うまで null を返す）
+    if (i >= 50) {
+      out[i] = {
+        ma5,
+        ma7,
+        ma20,
+        ma50,
+        rsi,
+        macd: macd !== null ? { macd, signal, histogram: signal !== null ? macd - signal : null, macdPrev, signalPrev } : null,
+        bb
+      };
+    } else {
+      out[i] = null;
     }
   }
 
-  const signal = ema(macdSeries, 9);
-  const histogram = macdValue - signal;
-
-  // クロス判定用（1本前）
-  const macdPrev =
-    macdSeries.length >= 2 ? macdSeries[macdSeries.length - 2] : null;
-
-  const signalPrev =
-    macdSeries.length >= 2
-      ? ema(macdSeries.slice(0, macdSeries.length - 1), 9)
-      : null;
-
-  return {
-    macd: macdValue,
-    signal: signal,
-    histogram: histogram,
-    macdPrev,
-    signalPrev
-  };
-}
-
-// ---- ボリンジャーバンド ----
-function calcBollingerBands(closes, period = 20, multiplier = 2) {
-  if (closes.length < period) return null;
-
-  const slice = closes.slice(-period);
-  const mean = slice.reduce((a, b) => a + b, 0) / period;
-
-  const variance =
-    slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
-
-  const std = Math.sqrt(variance);
-
-  return {
-    middle: mean,
-    upper: mean + multiplier * std,
-    lower: mean - multiplier * std,
-    width: (multiplier * std * 2) / mean
-  };
-}
-
-// ========= まとめて計算 =========
-export function calculateIndicators(candles) {
-  const closes = candles.map(c => c.close);
-
-  const ma5 = sma(closes, 5);
-  const ma20 = sma(closes, 20);
-  const ma7 = sma(closes, 7);
-  const ma50 = sma(closes, 50);
-  const rsi = calcRSI(closes, 14);
-  const macd = calcMACD(closes);
-  const bb = calcBollingerBands(closes, 20, 2);
-
-  return {
-    closes,
-    ma5,
-    ma20,
-    ma7,
-    ma50,
-    rsi,
-    macd,
-    bb
-  };
-}
-
-// 新しい関数：全ての足に対して一度だけインジケータを計算
-export function calculateAllIndicators(candles) {
-  return candles.map((_, i) => {
-    if (i < 50) return null;  // インジ計算できない足はスキップ
-    const slice = candles.slice(0, i + 1);
-    return calculateIndicators(slice);
-  });
+  return out;
 }

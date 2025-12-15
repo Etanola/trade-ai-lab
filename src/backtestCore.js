@@ -12,21 +12,23 @@ export function runBacktest(candles, initial = 200000, strategy) {
   let trades = 0;
   
   const indicators = calculateAllIndicators(candles);
+  const len = candles.length;
 
-  for (let i = 50; i < candles.length; i++) {
+  for (let i = 50; i < len; i++) {
     const ind = indicators[i];
+    if (!ind) continue;
     const price = candles[i].close;
 
     if (position === 0) {
       if (strategy.shouldBuy(ind)) {
         position = jpy / price;
         entry = price;
-        peak = price;  // Peakリセット
+        peak = price;
         jpy = 0;
         trades++;
       }
     } else {
-      peak = Math.max(peak, price);
+      if (price > peak) peak = price;
 
       if (strategy.shouldSell(ind, price, entry, peak)) {
         const value = position * price;
@@ -43,11 +45,16 @@ export function runBacktest(candles, initial = 200000, strategy) {
     }
 
     const equity = jpy + position * price;
-    maxEquity = Math.max(maxEquity, equity);
-    maxDD = Math.max(maxDD, (maxEquity - equity) / maxEquity);
+    if (equity > maxEquity) maxEquity = equity;
+    const dd = (maxEquity - equity) / maxEquity;
+    if (dd > maxDD) maxDD = dd;
   }
 
-  const finalEquity = jpy + position * candles[candles.length - 1].close;
+  const lastClose = candles[len - 1].close;
+  const finalEquity = jpy + position * lastClose;
+  const strategyName = strategy && strategy.name ? strategy.name : "(unknown)";
+
+  const totalTrades = win + lose;
 
   return {
     strategyName,
@@ -55,7 +62,7 @@ export function runBacktest(candles, initial = 200000, strategy) {
     trades,
     win,
     lose,
-    winRate: ((win / (win + lose)) * 100).toFixed(2),
+    winRate: totalTrades > 0 ? ((win / totalTrades) * 100).toFixed(2) : "0.00",
     dd: (maxDD * 100).toFixed(2)
   };
 }
