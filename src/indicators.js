@@ -3,7 +3,13 @@
 export function calculateAllIndicators(candles) {
   const n = candles.length;
   const closes = new Array(n);
-  for (let i = 0; i < n; i++) closes[i] = candles[i].close;
+  const highs = new Array(n);
+  const lows = new Array(n);
+  for (let i = 0; i < n; i++) {
+    closes[i] = candles[i].close;
+    highs[i] = candles[i].high;
+    lows[i] = candles[i].low;
+  }
 
   const out = new Array(n).fill(null);
 
@@ -26,6 +32,10 @@ export function calculateAllIndicators(candles) {
 
   // Bollinger 用
   let sum20sq = 0;
+  // ATR 用
+  const atrPeriod = 14;
+  let atr = null;
+  let prevCloseForTR = null;
 
   for (let i = 0; i < n; i++) {
     const close = closes[i];
@@ -136,6 +146,37 @@ export function calculateAllIndicators(candles) {
       };
     }
 
+    // ATR (Wilder smoothing)
+    let atrVal = null;
+    if (i >= 1) {
+      const high = highs[i];
+      const low = lows[i];
+      const prevClose = prevCloseForTR !== null ? prevCloseForTR : closes[i - 1];
+      const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+
+      if (atr === null && i >= atrPeriod) {
+        // initial ATR = average TR over period
+        let sumTR = 0;
+        for (let j = i - atrPeriod + 1; j <= i; j++) {
+          const ph = highs[j];
+          const pl = lows[j];
+          const pc = j - 1 >= 0 ? closes[j - 1] : closes[j];
+          const trj = Math.max(ph - pl, Math.abs(ph - pc), Math.abs(pl - pc));
+          sumTR += trj;
+        }
+        atr = sumTR / atrPeriod;
+      } else if (atr !== null) {
+        atr = (atr * (atrPeriod - 1) + tr) / atrPeriod;
+      }
+
+      prevCloseForTR = closes[i];
+      atrVal = atr;
+    }
+
+    // highest / lowest lookback (for breakout)
+    const hh20 = i >= 19 ? (() => { let m = -Infinity; for (let j = i - 19; j <= i - 1; j++) { if (highs[j] > m) m = highs[j]; } return m; })() : null;
+    const ll20 = i >= 19 ? (() => { let m = Infinity; for (let j = i - 19; j <= i - 1; j++) { if (lows[j] < m) m = lows[j]; } return m; })() : null;
+
     // 出力インジケータ（十分な情報が揃うまで null を返す）
     if (i >= 50) {
       out[i] = {
@@ -145,7 +186,10 @@ export function calculateAllIndicators(candles) {
         ma50,
         rsi,
         macd: macd !== null ? { macd, signal, histogram: signal !== null ? macd - signal : null, macdPrev, signalPrev } : null,
-        bb
+        bb,
+        atr: atrVal,
+        hh20,
+        ll20
       };
     } else {
       out[i] = null;
